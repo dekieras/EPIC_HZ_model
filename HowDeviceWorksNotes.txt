@@ -1,0 +1,92 @@
+Overview of how this device works:
+
+Trial is started
+trial_terminated = false;
+Probe is presented, 
+	prepare_trial();
+	present_probe();
+Stimulus field is presented:
+       cursor_in_motion = false;
+  in present_search_objects()
+{ n_trial_fixations = 0;
+stimulus_onset_time saved
+first_mouse_move_happened = false; // reset to wait for first mouse move to happen
+}
+cursor_in_motion = false; ??? not referred to anywhere
+state = WAITING_FOR_RESPONSE
+
+either Eyemovement, Ply, or Keystroke events start coming
+
+handle_Eyemovement_Start_event 
+{
+skip first fixation - ??? still want to do with current analysis?
+ignore if not WAITING_FOR_RESPONSE
+ignore if trial_terminated 
+
+do_aggregate_fixation()  to aggregate stats for the previous fixation
+}
+
+handle_Eyemovement_End_event
+{
+apply measurement error noise to fixation_location
+ignore if not WAITING_FOR_RESPONSE
+ignore if trial_terminated 
+save current as last_fixation_target_name, last_saccade_distance, last_fixation_location
+n_trial_fixations++;
+
+if too many fixations in this trial: trial_terminated = true; do nothing further
+
+ignore if fixation target (in the event) is part of the probe
+classify fixation location:
+if not using AOI, make last_fixated_Search_object be the closest to fixation location
+if using AOI, make last_fixated_Search_object be one of:
+	nothing, if in-between, set last_fixation_is_inbetween = true;
+	the AOI object if only one
+	the closest AOI object if more than one
+I have a todo here- don't count final fixation that is on the target ? Still current?
+
+if trial terminated, count it as terminated for the current trial condition
+}
+
+do_aggregate_fixation()
+{
+for the current trial condition, use last_fixation_X to accumulate:
+inbetween, AOI_fixation using last_fixation_is_inbetween
+
+if last_fixation_is_inbetween, accumulate nothing further - this isn't right - throws off the count for total number of fixations!
+
+todo: accumulate additional IBO statistics
+closest_not_target, saccade_distance, closest_distance, repeated, immediate_repeats, proportion of matches, etc.
+}
+
+
+handle_Ply_event
+{
+if trial_terminated, do nothing
+if state != WAITING_FOR_RESPONSE throw exception
+
+To do: modify to stop RT clock when cursor is first moved, no first ply submovement
+save current_pointed_to_object = ply event target name
+
+if WAITING_FOR_RESPONSE && !first_mouse_move_happened
+rt = get_time() - stimulus_onset_time
+first_mouse_move_happened = true;
+}
+
+handle_Keystroke_event
+{
+if state != WAITING_FOR_RESPONSE, throw exception if trial is not terminated
+
+if current_pointed_to_object is not the search target object, throw exception
+do_trial_end()
+}
+
+do_trial_end()
+{
+remove the stimulus
+accumulate:
+excess fixations if trial_terminated ?? didn't we count this already?
+rt, unique objects, fixated object frequencies, mean fixation frequency
+
+setup next trial (or experiment stop)
+}

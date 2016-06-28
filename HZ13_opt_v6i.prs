@@ -1,0 +1,2363 @@
+// v6i - reconciled with v6k where it should be
+// color proxy only in Shape-Only and Text-Only unknown object lookat rules
+// all color proxy removed except for number only unknown object v6i - adds mixture probabilities separate for Size, Shape, and Number only - Probability1, 2, 3 reassigned in order
+// color proxy removed for unknown object with Size only cue - color proxy added to all unknown object non-color-cue rules
+// v6h - like v6g, but color proxy restored for shape unknown object rules, add rules to look at random object if none fixated
+// v6g color proxy requirement commented out in lookat unknown object rules
+// v6f Probability3 used to flip coin for NOnly random, leaving Probability1 free for other conditions
+// v6e unknown_object rules now all have a closest vs random rule governed by Probability1, lookat rules are all closest
+// with Probability1 used to decide whether to enable centering for this trial.
+// V6d fix so that instead of moving eye immediately, it pauses long enough to give new nominations a chance
+// v6c - has mixture for centering on/off, all lookat rules that were hardcoded Randomly, now Closest
+// V6b - restore previous size, shape accuity function, disable centering
+// V6a - moves eye immedidately after movement is complete
+// v6 additional change so that we move on if there is no visible label after the eye movment as well
+//change so that it unconditionally moves to the next target instead of completing the check - this will match basically only
+// if the label is already present
+// added nomination as unencoded_text if text not visible before moving on -4/7/16 late
+// v5 alter the strategy for checking candidate for match to terminate if a mismatching cue property is detected
+// - found apparent bug: the Nominate rules were all excluding a nomination of same_color_size_shape regardless
+// of what nomination the rule added - fixed all these, but implies previous versions were quite wrong
+// this would generate multiple fixations on the same object.
+
+// v4 restart to look at closest vs Random strategies
+// v3c lookat_unknown_object for Color cue uses mixture for closest vs random
+// v3b changed lookat_unknown_object for Color cue to be random instead of closest.
+// v3 based on v2y, with mixture for all no-match cases
+// in Number only case, use a mixture of look at closest versus look at random
+// add to NO look-at rule that candidate must have a color - as a surrogate for "visibility"
+// optimum version of HZ13_subopt_single_v3e.prs using rules from W67_opt2b
+// started wtih opt1, reordered priority to favor least available instead of most available,
+// on the basis that e.g. if you see a matching shape, that is a more valuable
+// match than matching color ..., so shape > size > color
+
+// optimal model, uses all attributes to nominate and choose candidates
+// but optimum use of attributes depends on cuing condition:
+// if an attribute is uncued, it doesn't matter what it is
+// if it is cued then partial nomination requires that it be unknown
+// but note all possible combinations must be represented!
+// nominations are always in terms of cued attributes that are present, so
+// if color, size cued, the nomination would be color&shape, color, shape
+// depending on whether color and/or shape was matched for some object.
+
+// in this version, if nomination involves color, then a random choice from the nominations is made
+// otherwise, the closest choice from the nominations is made.
+
+// change so that we nominate all matches, then pick the closest one at eye movement launch time
+
+// commented out waiting for Eccentricity_zone, Ocular Free before accepting match on Text,
+// since Text will surely be foveal only
+
+(Define Initial_memory_contents (Goal Do Visual_search))
+(Define Named_location Center_screen 0.0 0.0)
+(Define Named_location Mouse_target_location 0.0 1.0) 
+(Define Named_location Size_location 0.0 0.6) 
+(Define Named_location Color_location 0.0 0.2)
+(Define Named_location Shape_location 0.0 -0.2)
+(Define Named_location Label_location 0.0 -0.6)
+(Define Named_location Far_away 0.0 -5.0)
+
+
+(Define Parameters
+//	(Eye Eccentricity_fluctuation_factor Normal When_used 1.0 .1)
+	(Eye Eccentricity_fluctuation_factor Fixed 1.0)
+	
+	(Ocular Initiation_time Fixed 25) 
+	(Ocular Voluntary_saccade_distance_slope Fixed .95) // default is 0.95
+	(Ocular Voluntary_saccade_SD_slope Fixed 0.10) // default is 0.10
+	(Invol_ocular Initiation_time Fixed 25) // same as voluntary
+	
+// using new availability detection functions
+// parameters: delay, lapse rate, a, b, c, d, {sd, noise_coeff, coeff_variation}
+// encoding times all set to 25 instead of 49 - 4/10/16
+// (Eye Availability Color        CubicConstSD 25 0.0 0.05 0.2 0.00 0.0005 0.5) // original
+//(Eye Availability Color CubicConstSD 25 0.0 0.05 0.2 0.00 0.002 0.5) // Large decays to 0 at 10 DVA
+(Eye Availability Color CubicConstSD 25 0.0 0.05 0.2 0.00 0.001 0.5) 
+//(Eye Availability Color CubicConstSD 25 0.0 0.05 0.2 0.00 0.0005 0.5) // Large decays to 0 at 14 DVA
+
+//(Eye Availability Encoded_size CubicConstSD 25 0.0 0.05 0.2 0.00 0.01   0.5) // original Encoded_size 4/3/16
+//(Eye Availability Encoded_size CubicConstSD 25 0.0 0.05 0.2 0.00 0.015 1.0) 
+//(Eye Availability Encoded_size CubicConstSD 25 0.0 0.05 0.2 0.00 0.015 0.5) 
+(Eye Availability Encoded_size CubicConstSD 25 0.0 0.05 0.2 0.00 0.02 0.5) 
+
+//(Eye Availability Shape        CubicConstSD 25 0.0 0.05 0.2 0.00 0.0250 0.5) // original Shape 4/3/16
+//(Eye Availability Shape        CubicConstSD 25 0.0 0.05 0.2 0.00 0.07  1.0)
+//(Eye Availability Shape        CubicConstSD 25 0.0 0.05 0.2 0.00 0.05  1.0)
+//(Eye Availability Shape CubicConstSD 25 0.0 0.05 0.2 0.00 0.03  1.0)
+(Eye Availability Shape CubicConstSD 25 0.0 0.05 0.2 0.00 0.035  1.0)
+
+//(Eye Availability Text       CubicConstSD 49 0.0 0.05 0.2 0.00 0.025 0.2) // test - high at 0 degrees, 0.8 at 1, .15 at 2, fast drop off
+//(Eye Availability Text       CubicConstSD 49 0.0 0.05 0.2 0.00 0.1 0.2) // test - .9 at 0 degrees, 0.675 at 1, .0 at 2, fast drop off
+(Eye Availability Text CubicConstSD 49 0.0 0.05 0.2 0.00 0.025 0.2)
+//(Eye Availability Text        CubicConstSD 49 0.0 0.05 0.1 0.00 0.13 0.15) //from clusterfit 3/14/15
+//(Eye Availability Text        CubicConstSD 25 0.0 0.05 0.2 0.00 0.0250 0.5) // same as shape original value
+//(Eye Availability Text        CubicConstSD 49 0.0 0.05 0.2 0.00 0.0005 0.5) // same as color
+//(Eye Availability Text 		CubicConstSD 25 0.0 0.05 0.2 0.00 0.01   0.5) // same as Encoded_Size original value
+
+//(Visual_perceptual_store Property_decay_time Fixed 30000)
+//(Visual_perceptual_store Property_decay_time Fixed 15000)
+(Visual_perceptual_store Property_decay_time Fixed 8000)
+//(Visual_perceptual_store Property_decay_time Normal When_used 5000 1000)
+//(Visual_perceptual_store Property_decay_time Fixed 4000)
+
+(Visual_perceptual_processor Recoding_time Color 25)
+(Visual_perceptual_processor Recoding_time Encoded_size 25)
+(Visual_perceptual_processor Recoding_time Shape 25)
+(Visual_perceptual_processor Recoding_time Text 25)
+	
+(Cognitive Probability1 Fixed 0.33) // choose to enable centering on this trial
+// If matching object not available, with this probabilty choose a rondom qualifying object instead of closest one
+(Cognitive Probability2 Fixed 0.8) // for Color cue
+(Cognitive Probability3 Fixed 0.43) // for Color uncued Size cued, Shape either way
+//(Cognitive Probability3 Fixed 0.33) // for Color uncued Size cued, Shape either way
+(Cognitive Probability4 Fixed 0.5) // for only Shape cued
+//(Cognitive Probability4 Fixed 0.33) // for only Shape cued
+(Cognitive Probability5 Fixed 0.2) // for Number-Only cue
+//(Cognitive Probability5 Fixed 0.15) // for Number-Only cue
+
+) // end of parameter block
+
+
+(Top_mfg
+If
+(
+	(Goal Do Visual_search)
+	(Not (Step ??? ???))
+ )
+Then
+(
+//	(Send_to_motor Ocular Perform Set_mode Enable Centering)
+	(Add (Step Start Trial))
+ )
+)
+
+(Top_start_trial
+If
+(
+	(Goal Do Visual_search)
+	(Step Start Trial)
+	(Motor Ocular Processor Free)
+)
+Then
+(
+	(Add (Step Enable_disable Centering))
+	(Add_with_probability Probability1 (Strategy Enable Centering))
+	(Send_to_motor Ocular Perform Move Center_screen)
+	(Delete (Step Start Trial))
+	(Add (Step Waitfor Probe_Onset))
+))
+
+
+(Top_centering_enable
+If
+(
+	(Goal Do Visual_search)
+	(Step Enable_disable Centering)
+	(Strategy Enable Centering)
+	(Motor Ocular Processor Free)
+)
+Then
+(
+//	(Log Enable Centering)
+	(Send_to_motor Ocular Perform Set_mode Enable Centering)
+	(Delete (Strategy Enable Centering))
+	(Delete (Step Enable_disable Centering))
+))
+
+(Top_centering_disable
+If
+(
+	(Goal Do Visual_search)
+	(Step Enable_disable Centering)
+	(Not (Strategy Enable Centering))
+	(Motor Ocular Processor Free)
+)
+Then
+(
+//	(Log Disable Centering)
+	(Send_to_motor Ocular Perform Set_mode Disable Centering)
+	(Delete (Step Enable_disable Centering))
+))
+
+
+
+// tag the cursor object
+(Top_cursor_visible
+If
+(
+	(Goal Do Visual_search)
+	(Step Waitfor Probe_Visible)
+	(Visual Cursor Status Visible)
+	(Not (Tag Cursor Cursor))
+)
+Then
+(
+	(Add (Tag Cursor Cursor))	// to simplify blocking nominations of cursor
+
+))
+
+(Top_probe_onset
+If
+(
+	(Goal Do Visual_search)
+	(Step Waitfor Probe_Onset)
+	(Visual ??? Detection Onset)
+)
+Then
+(
+	(Delete (Step Waitfor Probe_Onset))
+	(Add (Step Waitfor Probe_Visible))
+))
+
+(Top_probe_visible
+If
+(
+	(Goal Do Visual_search)
+	(Step Waitfor Probe_Visible)
+	(Visual ??? Status Visible)
+)
+Then
+(
+	(Delete (Step Waitfor Probe_Visible))
+	(Add (Step Lookat Mouse_target_location))
+))
+
+(Top_lookat_mouse_target
+If
+(
+	(Goal Do Visual_search)
+	(Step Lookat Mouse_target_location)
+	(Motor Ocular Modality Free)
+)
+Then
+(
+	(Send_to_motor Ocular Perform Move Mouse_target_location)
+	(Delete (Step Lookat Mouse_target_location))
+	(Add (Step Lookat Size_location))
+))
+
+(Top_lookat_size
+If
+(
+	(Goal Do Visual_search)
+	(Step Lookat Size_location)
+	(Motor Ocular Modality Free)
+)
+Then
+(
+	(Send_to_motor Ocular Perform Move Size_location)
+	(Delete (Step Lookat Size_location))
+	(Add (Step Lookat Color_location))
+))
+
+(Top_lookat_color
+If
+(
+	(Goal Do Visual_search)
+	(Step Lookat Color_location)
+	(Motor Ocular Processor Free)
+)
+Then
+(
+	(Send_to_motor Ocular Perform Move Color_location)
+	(Delete (Step Lookat Color_location))
+	(Add (Step Lookat Shape_location))
+))
+
+(Top_lookat_shape
+If
+(
+	(Goal Do Visual_search)
+	(Step Lookat Shape_location)
+	(Motor Ocular Processor Free)
+)
+Then
+(
+	(Send_to_motor Ocular Perform Move Shape_location)
+	(Delete (Step Lookat Shape_location))
+	(Add (Step Lookat Label_location))
+))
+
+
+(Top_lookat_label
+If
+(
+	(Goal Do Visual_search)
+	(Step Lookat Label_location)
+	(Motor Ocular Processor Free)
+)
+Then
+(
+	(Send_to_motor Ocular Perform Move Label_location)
+	(Delete (Step Lookat Label_location))
+	(Add (Step Waitfor Label))
+))
+
+(Top_waitfor_label
+If
+(
+	(Goal Do Visual_search)
+	(Step Waitfor Label)
+	(Motor Ocular Processor Free)
+)
+Then
+(
+	(Delete (Step Waitfor Label))
+	(Add (Step Waitfor Label1))
+))
+
+(Top_waitfor_label1
+If
+(
+	(Goal Do Visual_search)
+	(Step Waitfor Label1)
+	(Motor Ocular Processor Free)
+)
+Then
+(
+	(Delete (Step Waitfor Label1))
+	(Add (Step Waitfor Label2))
+))
+
+(Top_waitfor_label2
+If
+(
+	(Goal Do Visual_search)
+	(Step Waitfor Label2)
+	(Motor Ocular Processor Free)
+)
+Then
+(
+	(Delete (Step Waitfor Label2))
+	(Add (Step Waitfor Label3))
+))
+
+(Top_waitfor_label3
+If
+(
+	(Goal Do Visual_search)
+	(Step Waitfor Label3)
+	(Motor Ocular Processor Free)
+)
+Then
+(
+	(Delete (Step Waitfor Label3))
+	(Add (Step Check Probe))
+))
+
+// at this point, everything should be visible.
+// If text is missing for a probe part, do the whole thing over
+
+(Top_check_probe_all_perceived
+If
+(
+	(Goal Do Visual_search)
+	(Step Check Probe)
+	(Visual ?probe_mouse_target Text XX)
+	(Visual ?probe_mouse_target Above ?probe_size)
+	(Visual ?probe_size Text ?size)
+	(Visual ?probe_size Above ?probe_color)
+	(Visual ?probe_color Text ?color)
+	(Visual ?probe_color Below ?probe_size)
+	(Visual ?probe_color Above ?probe_shape)
+	(Visual ?probe_shape Text ?shape)
+	(Visual ?probe_shape Below ?probe_color)
+	(Visual ?probe_shape Above ?probe_label)
+	(Visual ?probe_label Text ?label)
+	(Visual ?probe_label Below ?probe_shape)
+	(Different ?size Unknown)
+	(Different ?color Unknown)
+	(Different ?shape Unknown)
+	(Different ?label Unknown)
+	(Motor Ocular Modality Free)
+)
+Then
+(
+	(Add (Tag ?probe_mouse_target Probe_mouse_target))
+	(Add (Tag ?probe_label Probe_label_object))
+	(Add (Tag ?probe_mouse_target Probe_part))
+	(Add (Tag ?probe_size Probe_part))
+	(Add (Tag ?probe_color Probe_part))
+	(Add (Tag ?probe_shape Probe_part))
+	(Add (Tag ?probe_label Probe_part))
+	(Add (Tag ?label Label))
+	(Add (Tag ?shape Shape))
+	(Add (Tag ?color Color))
+	(Add (Tag ?size Size))
+))
+
+(Top_check_probe_control
+If
+(
+	(Goal Do Visual_search)
+	(Step Check Probe)
+	(Motor Ocular Modality Free)
+)
+Then
+(
+	(Delete (Step Check Probe))
+	(Add (Step Check ProbeGood))
+))
+
+(Top_got_all_probe_fields
+If
+(
+	(Goal Do Visual_search)
+	(Step Check ProbeGood)
+	(Tag ?label Label)
+	(Tag ?shape Shape)
+	(Tag ?color Color)
+	(Tag ?size Size)
+	(Tag ?probe_mouse_target Probe_mouse_target)
+	(Motor Ocular Modality Free)
+	(Motor Manual Modality Free)
+)
+Then
+(
+	(Send_to_motor Ocular Perform Move ?probe_mouse_target)
+	// clickable region was 0.8 DVA in Size
+	(Send_to_motor Manual Perform Click_on ?probe_mouse_target 0.8)
+	(Delete (Step Check ProbeGood))
+	(Add (Step Waitfor Candidates))
+))
+
+(Top_didnt_get_probe_look_again-label
+If
+(
+	(Goal Do Visual_search)
+	(Step Check ProbeGood)
+	(Not (Tag ??? Label))
+	(Motor Ocular Modality Free)
+)
+Then
+(
+	(Send_to_motor Ocular Perform Move Far_away)
+	(Delete (Step Check ProbeGood))
+	(Add (Step Lookat Size_location))
+))
+
+
+// wait for a non-probe onset to signal the appearance of new objects to search
+(Top_waitfor_candidates_onset
+If
+(
+	(Goal Do Visual_search)
+	(Step Waitfor Candidates)
+	(Visual ??? Detection Onset)
+	(Use_only_one)
+)
+Then
+(
+	(Delete (Step Waitfor Candidates))
+	// start threads and then wait for trial-done status to appear
+	(Add (Goal Do Nominate))	// will terminate when response made
+	 // delay until properties have had a chance to arrive
+//	(Add (Goal Do Choose))	// will terminate when response made
+//	(Add (Goal Check Fixated))	// will terminate when response made
+	(Add (Step Waitfor TrialDone))
+	(Add (Step Waitfor TrialStopSignal))
+))
+
+
+// The appearance of a Beep means to stop
+(Daemon_wait_for_stop_signal
+If
+(
+	(Goal Do Visual_search)
+	(Step Waitfor TrialStopSignal)
+	(Auditory ?signal Timbre Beep)
+)
+Then
+(
+	// shutdown threads
+	(Add (Tag ?signal Stop_signal))
+	(Add (Goal Shutdown Nominate))
+	(Add (Goal Shutdown Choose))
+	(Add (Goal Shutdown CheckFixated))
+	(Delete (Step Waitfor TrialStopSignal))
+	(Add (Step Waitfor StopSignalGone))
+))
+
+// Pause until Stop_signal fades
+
+(Wait_for_stop_signal_gone
+If
+(
+	(Goal Do Visual_search)
+	(Step Waitfor StopSignalGone)
+	(Tag ?signal Stop_signal)
+	(Not (Auditory ?signal Status Audible))
+)
+Then
+(
+	(Delete (Step Waitfor StopSignalGone))
+	(Add (Status Trial Done))
+))
+
+(Top_trial_done
+If
+(
+	(Goal Do Visual_search)
+	(Step Waitfor TrialDone)
+	(Status Trial Done)
+)
+Then
+(
+	// shutdown remaining thread, cleanup memory, and then wait for trial to start
+	(Add (Goal Shutdown Nominate))
+	(Add (Goal Shutdown Choose)) 
+	(Add (Goal Shutdown CheckFixated))
+	(Add (Step Cleanup Memory))
+	(Delete (Step Waitfor TrialStopSignal))
+	(Delete (Step Waitfor TrialDone))
+	(Delete (Status Trial Done))
+	(Add (Step Start Trial))
+))
+
+(Top_cleanup
+If (
+	(Goal Do Visual_search)
+	(Step Cleanup Memory)
+	(Tag ?x ?y)
+)
+Then (
+	(Delete (Tag ?x ?y))
+	(Delete (Step Cleanup Memory))
+))
+
+
+
+
+// Nomination thread: Nominate candidates to look at
+// We nominate objects continuously. 
+// The other choose and checks threads keep the candidate item 
+// tagged to prevent a renomination of it while examining it is underway.
+
+(NC_startup
+If
+(
+	(Goal Do Nominate)
+	(Not (Step Nominate ??? ???))
+)
+Then
+(
+	(Add (Step Nominate Nominate Candidates))
+	(Add (Step Nominate Pause_for Properties))
+))
+
+(NC_pause
+If
+(
+	(Goal Do Nominate)
+	(Step Nominate Pause_for Properties)
+)
+Then
+(
+	(Delete (Step Nominate Pause_for Properties))
+	(Add (Step Nominate Pause_for Properties2))
+))
+
+(NC_start_nominations
+If
+(
+	(Goal Do Nominate)
+	(Step Nominate Pause_for Properties2)
+)
+Then
+(
+	(Delete (Step Nominate Pause_for Properties2))
+	(Add (Goal Do Choose))	// will terminate when response made
+	(Add (Goal Check Fixated))	// will terminate when response made
+))
+
+// shutdown rule - remove all NC goals, steps, and tags
+// this is called by top level because this thread doesn't terminate itself
+(Nominate_shutdown_start
+If (
+	(Goal Shutdown Nominate)
+	(Not (Step Nominate_shutdown ???))
+)
+Then (
+	(Add (Step Nominate_shutdown Cleanup))
+	(Delete (Goal Do Nominate)) // pull the goal and halt new rule firings
+))
+
+(Nominate_shutdown_clear_steps
+If (
+	(Goal Shutdown Nominate)
+	(Step Nominate_shutdown Cleanup)
+	(Step Nominate ?x ?y)
+)
+Then (
+	(Delete (Step Nominate ?x ?y))
+))
+
+(Nominate_shutdown_clear_tags_two
+If (
+	(Goal Shutdown Nominate)
+	(Step Nominate_shutdown Cleanup)
+	(Tag Nominate ?x ?y)
+)
+Then (
+	(Delete (Tag Nominate ?x ?y2))
+))
+
+(Nominate_shutdown_clear_tags_three
+If (
+	(Goal Shutdown Nominate)
+	(Step Nominate_shutdown Cleanup)
+	(Tag Nominate ?x ?y ?z)
+)
+Then (
+	(Delete (Tag Nominate ?x ?y ?z))
+))
+
+(Nominate_shutdown_done
+If (
+	(Goal Shutdown Nominate)
+	(Step Nominate_shutdown Cleanup)
+)
+Then (
+	(Delete (Step Nominate_shutdown Cleanup))
+	(Delete (Goal Shutdown Nominate))
+))
+
+(Choose_shutdown_start
+If (
+	(Goal Shutdown Choose)
+	(Not (Step Choose_shutdown ???))
+)
+Then (
+	(Add (Step Choose_shutdown Cleanup))
+	(Delete (Goal Do Choose)) // pull the goal and halt new rule firings
+))
+
+(Choose_shutdown_clear_steps
+If (
+	(Goal Shutdown Choose)
+	(Step Choose_shutdown Cleanup)
+	(Step Choose ?x ?y)
+)
+Then (
+	(Delete (Step Choose ?x ?y))
+))
+
+(Choose_shutdown_clear_tags_two
+If (
+	(Goal Shutdown Choose)
+	(Step Choose_shutdown Cleanup)
+	(Tag Choose ?x ?y)
+)
+Then (
+	(Delete (Tag Choose ?x ?y))
+))
+
+(Choose_shutdown_clear_tags_three
+If (
+	(Goal Shutdown Choose)
+	(Step Choose_shutdown Cleanup)
+	(Tag Choose ?x ?y ?z)
+)
+Then (
+	(Delete (Tag Choose ?x ?y ?z))
+))
+
+(Choose_shutdown_done
+If (
+	(Goal Shutdown Choose)
+	(Step Choose_shutdown Cleanup)
+)
+Then (
+	(Delete (Step Choose_shutdown Cleanup))
+	(Delete (Goal Shutdown Choose))
+))
+
+
+
+// nominate a candidate for a revisit
+// tag was added by check-fixated, cleared if matched here
+(NC_nominate_unencoded_text
+If
+(
+	(Goal Do Nominate)
+	(Step Nominate Nominate Candidates)
+	(Tag ?nominee Text_not_seen)
+	(Not (Tag ?nominee Cursor)) // not the cursor
+	(Not (Tag ?nominee Probe_part))		// no part of the probe
+	(Not (Tag ?nominee candidate))		// not candidate currently
+	(Not (Tag ?nominee fixated))		// not being fixated currently
+	(Not (Tag Nominate ?nominee unencoded_text nomination))
+)
+Then
+(
+	(Add (Tag Nominate ?nominee unencoded_text nomination))
+	(Delete (Tag ?nominee Text_not_seen))
+))
+
+// nominate a candidate with the same label - in case it is now visible
+(NC_nominate_probe_text
+If
+(
+	(Goal Do Nominate)
+	(Step Nominate Nominate Candidates)
+	(Tag ?label Label)
+	(Visual ?nominee_label Inside ?nominee)
+	(Visual ?nominee_label Text ?label)
+	(Not (Tag ?nominee Cursor)) // not the cursor
+	(Not (Tag ?nominee Probe_part))		// no part of the probe
+	(Not (Tag ?nominee candidate))		// not candidate currently
+	(Not (Tag ?nominee fixated))		// not being fixated currently
+	(Not (Tag Nominate ?nominee same_label nomination))
+)
+Then
+(
+	(Add (Tag Nominate ?nominee same_label nomination))
+))
+
+// nomination rules in this order:
+// cue conditions enumerated as if counting in binary uncued = 0, cued = 1 {color, size, shape}
+// within each cue condition, known properties enumerated with unknown = 0, known = 1 {color, size, shape}
+// but the nominations rules all require that at least one cued property must be known
+
+(NC_shape_cued_shape_known
+If
+(
+	(Goal Do Nominate)
+	(Step Nominate Nominate Candidates)
+	(Tag --- Color) // not cued
+	(Tag --- Size) // not cued
+	(Tag ?shape Shape) // cued
+	(Visual ?nominee Shape ?shape)
+	// exclusions:
+	(Visual ?nominee_label Inside ?nominee)
+	(Not (Visual ?nominee_label Text ???))	// don't nominate one with a known label
+	(Not (Tag ?nominee Cursor)) // not the cursor
+	(Not (Tag ?nominee Probe_part))		// not part of the probe
+	(Not (Tag ?nominee candidate))		// not candidate currently
+	(Not (Tag ?nominee fixated))		// not being fixated currently
+	(Not (Tag Nominate ?nominee same_shape nomination))
+)
+Then
+(
+	(Add (Tag Nominate ?nominee same_shape nomination))
+))
+
+(NC_size_cued_size_known
+If
+(
+	(Goal Do Nominate)
+	(Step Nominate Nominate Candidates)
+	(Tag --- Color) // not cued
+	(Tag ?size Size) // cued
+	(Visual ?nominee Encoded_size ?size)
+	(Tag --- Shape) // not cued
+	// exclusions:
+	(Visual ?nominee_label Inside ?nominee)
+	(Not (Visual ?nominee_label Text ???))	// don't nominate one with a known label
+	(Not (Tag ?nominee Cursor)) // not the cursor
+	(Not (Tag ?nominee Probe_part))		// not part of the probe
+	(Not (Tag ?nominee candidate))		// not candidate currently
+	(Not (Tag ?nominee fixated))		// not being fixated currently
+	(Not (Tag Nominate ?nominee same_size nomination))
+)
+Then
+(
+	(Add (Tag Nominate ?nominee same_size nomination))
+))
+
+(NC_size_shape_cued_shape_known
+If
+(
+	(Goal Do Nominate)
+	(Step Nominate Nominate Candidates)
+	(Tag --- Color) // not cued
+	(Not (Tag --- Size)) // cued
+	(Not (Visual ?nominee Encoded_size ???))
+	(Tag ?shape Shape) // cued
+	(Visual ?nominee Shape ?shape)
+	// exclusions:
+	(Visual ?nominee_label Inside ?nominee)
+	(Not (Visual ?nominee_label Text ???))	// don't nominate one with a known label
+	(Not (Tag ?nominee Cursor)) // not the cursor
+	(Not (Tag ?nominee Probe_part))		// not part of the probe
+	(Not (Tag ?nominee candidate))		// not candidate currently
+	(Not (Tag ?nominee fixated))		// not being fixated currently
+	(Not (Tag Nominate ?nominee same_shape nomination))
+)
+Then
+(
+	(Add (Tag Nominate ?nominee same_shape nomination))
+))
+
+(NC_size_shape_cued_size_known
+If
+(
+	(Goal Do Nominate)
+	(Step Nominate Nominate Candidates)
+	(Tag --- Color) // not cued
+	(Tag ?size Size) // cued
+	(Visual ?nominee Encoded_size ?size)
+	(Not (Tag --- Shape)) // cued
+	(Not (Visual ?nominee Shape ???))
+	// exclusions:
+	(Visual ?nominee_label Inside ?nominee)
+	(Not (Visual ?nominee_label Text ???))	// don't nominate one with a known label
+	(Not (Tag ?nominee Cursor)) // not the cursor
+	(Not (Tag ?nominee Probe_part))		// not part of the probe
+	(Not (Tag ?nominee candidate))		// not candidate currently
+	(Not (Tag ?nominee fixated))		// not being fixated currently
+	(Not (Tag Nominate ?nominee same_size nomination))
+)
+Then
+(
+	(Add (Tag Nominate ?nominee same_size nomination))
+))
+
+(NC_size_shape_cued_size_shape_known
+If
+(
+	(Goal Do Nominate)
+	(Step Nominate Nominate Candidates)
+	(Tag --- Color) // not cued
+	(Tag ?size Size) // cued
+	(Visual ?nominee Encoded_size ?size)
+	(Tag ?shape Shape) // cued
+	(Visual ?nominee Shape ?shape)
+	// exclusions:
+	(Visual ?nominee_label Inside ?nominee)
+	(Not (Visual ?nominee_label Text ???))	// don't nominate one with a known label
+	(Not (Tag ?nominee Cursor)) // not the cursor
+	(Not (Tag ?nominee Probe_part))		// not part of the probe
+	(Not (Tag ?nominee candidate))		// not candidate currently
+	(Not (Tag ?nominee fixated))		// not being fixated currently
+	(Not (Tag Nominate ?nominee same_size_shape nomination))
+)
+Then
+(
+	(Add (Tag Nominate ?nominee same_size_shape nomination))
+))
+
+(NC_color_cued_color_known
+If
+(
+	(Goal Do Nominate)
+	(Step Nominate Nominate Candidates)
+	(Tag ?color Color) // cued
+	(Visual ?nominee Color ?color)
+	(Tag --- Size) // not cued
+	(Tag --- Shape) // not cued
+	// exclusions:
+	(Visual ?nominee_label Inside ?nominee)
+	(Not (Visual ?nominee_label Text ???))	// don't nominate one with a known label
+	(Not (Tag ?nominee Cursor)) // not the cursor
+	(Not (Tag ?nominee Probe_part))		// not part of the probe
+	(Not (Tag ?nominee candidate))		// not candidate currently
+	(Not (Tag ?nominee fixated))		// not being fixated currently
+	(Not (Tag Nominate ?nominee same_color nomination))
+)
+Then
+(
+	(Add (Tag Nominate ?nominee same_color nomination))
+))
+
+(NC_color_shape_cued_shape_known
+If
+(
+	(Goal Do Nominate)
+	(Step Nominate Nominate Candidates)
+	(Not (Tag --- Color)) // cued
+	(Not (Visual ?nominee Color ???))
+	(Tag --- Size) // not cued
+	(Tag ?shape Shape) // cued
+	(Visual ?nominee Shape ?shape)
+	// exclusions:
+	(Visual ?nominee_label Inside ?nominee)
+	(Not (Visual ?nominee_label Text ???))	// don't nominate one with a known label
+	(Not (Tag ?nominee Cursor)) // not the cursor
+	(Not (Tag ?nominee Probe_part))		// not part of the probe
+	(Not (Tag ?nominee candidate))		// not candidate currently
+	(Not (Tag ?nominee fixated))		// not being fixated currently
+	(Not (Tag Nominate ?nominee same_shape nomination))
+)
+Then
+(
+	(Add (Tag Nominate ?nominee same_shape nomination))
+))
+
+(NC_color_shape_cued_color_known
+If
+(
+	(Goal Do Nominate)
+	(Step Nominate Nominate Candidates)
+	(Tag ?color Color) // cued
+	(Visual ?nominee Color ?color)
+	(Tag --- Size) // not cued
+	(Not (Tag --- Shape)) // cued
+	(Not (Visual ?nominee Shape ???))
+	// exclusions:
+	(Visual ?nominee_label Inside ?nominee)
+	(Not (Visual ?nominee_label Text ???))	// don't nominate one with a known label
+	(Not (Tag ?nominee Cursor)) // not the cursor
+	(Not (Tag ?nominee Probe_part))		// not part of the probe
+	(Not (Tag ?nominee candidate))		// not candidate currently
+	(Not (Tag ?nominee fixated))		// not being fixated currently
+	(Not (Tag Nominate ?nominee same_color nomination))
+)
+Then
+(
+	(Add (Tag Nominate ?nominee same_color nomination))
+))
+
+(NC_color_shape_cued_color_shape_known
+If
+(
+	(Goal Do Nominate)
+	(Step Nominate Nominate Candidates)
+	(Tag ?color Color) // cued
+	(Visual ?nominee Color ?color)
+	(Tag --- Size) // not cued
+	(Tag ?shape Shape) // cued
+	(Visual ?nominee Shape ?shape)
+	// exclusions:
+	(Visual ?nominee_label Inside ?nominee)
+	(Not (Visual ?nominee_label Text ???))	// don't nominate one with a known label
+	(Not (Tag ?nominee Cursor)) // not the cursor
+	(Not (Tag ?nominee Probe_part))		// not part of the probe
+	(Not (Tag ?nominee candidate))		// not candidate currently
+	(Not (Tag ?nominee fixated))		// not being fixated currently
+	(Not (Tag Nominate ?nominee same_color_shape nomination))
+)
+Then
+(
+	(Add (Tag Nominate ?nominee same_color_shape nomination))
+))
+
+(NC_color_size_cued_size_known
+If
+(
+	(Goal Do Nominate)
+	(Step Nominate Nominate Candidates)
+	(Not (Tag --- Color)) // cued
+	(Not (Visual ?nominee Color ???))
+	(Tag ?size Size) // cued
+	(Visual ?nominee Encoded_size ?size)
+	(Tag --- Shape) // not cued
+	// exclusions:
+	(Visual ?nominee_label Inside ?nominee)
+	(Not (Visual ?nominee_label Text ???))	// don't nominate one with a known label
+	(Not (Tag ?nominee Cursor)) // not the cursor
+	(Not (Tag ?nominee Probe_part))		// not part of the probe
+	(Not (Tag ?nominee candidate))		// not candidate currently
+	(Not (Tag ?nominee fixated))		// not being fixated currently
+	(Not (Tag Nominate ?nominee same_size nomination))
+)
+Then
+(
+	(Add (Tag Nominate ?nominee same_size nomination))
+))
+
+(NC_color_size_cued_color_known
+If
+(
+	(Goal Do Nominate)
+	(Step Nominate Nominate Candidates)
+	(Tag ?color Color) // cued
+	(Visual ?nominee Color ?color)
+	(Not (Tag --- Size)) // cued
+	(Not (Visual ?nominee Encoded_size ???))
+	(Tag --- Shape) // not cued
+	// exclusions:
+	(Visual ?nominee_label Inside ?nominee)
+	(Not (Visual ?nominee_label Text ???))	// don't nominate one with a known label
+	(Not (Tag ?nominee Cursor)) // not the cursor
+	(Not (Tag ?nominee Probe_part))		// not part of the probe
+	(Not (Tag ?nominee candidate))		// not candidate currently
+	(Not (Tag ?nominee fixated))		// not being fixated currently
+	(Not (Tag Nominate ?nominee same_color nomination))
+)
+Then
+(
+	(Add (Tag Nominate ?nominee same_color nomination))
+))
+
+(NC_color_size_cued_color_size_known
+If
+(
+	(Goal Do Nominate)
+	(Step Nominate Nominate Candidates)
+	(Tag ?color Color) // cued
+	(Visual ?nominee Color ?color)
+	(Tag ?size Size) // cued
+	(Visual ?nominee Encoded_size ?size)
+	(Tag --- Shape) // not cued
+	// exclusions:
+	(Visual ?nominee_label Inside ?nominee)
+	(Not (Visual ?nominee_label Text ???))	// don't nominate one with a known label
+	(Not (Tag ?nominee Cursor)) // not the cursor
+	(Not (Tag ?nominee Probe_part))		// not part of the probe
+	(Not (Tag ?nominee candidate))		// not candidate currently
+	(Not (Tag ?nominee fixated))		// not being fixated currently
+	(Not (Tag Nominate ?nominee same_color_size nomination))
+)
+Then
+(
+	(Add (Tag Nominate ?nominee same_color_size nomination))
+))
+
+(NC_color_size_shape_cued_shape_known
+If
+(
+	(Goal Do Nominate)
+	(Step Nominate Nominate Candidates)
+	(Not (Tag --- Color)) // cued
+	(Not (Visual ?nominee Color ???))
+	(Not (Tag --- Size)) // cued
+	(Not (Visual ?nominee Encoded_size ???))
+	(Tag ?shape Shape) // cued
+	(Visual ?nominee Shape ?shape)
+	// exclusions:
+	(Visual ?nominee_label Inside ?nominee)
+	(Not (Visual ?nominee_label Text ???))	// don't nominate one with a known label
+	(Not (Tag ?nominee Cursor)) // not the cursor
+	(Not (Tag ?nominee Probe_part))		// not part of the probe
+	(Not (Tag ?nominee candidate))		// not candidate currently
+	(Not (Tag ?nominee fixated))		// not being fixated currently
+	(Not (Tag Nominate ?nominee same_shape nomination))
+)
+Then
+(
+	(Add (Tag Nominate ?nominee same_shape nomination))
+))
+
+(NC_color_size_shape_cued_size_known
+If
+(
+	(Goal Do Nominate)
+	(Step Nominate Nominate Candidates)
+	(Not (Tag --- Color)) // cued
+	(Not (Visual ?nominee Color ???))
+	(Tag ?size Size) // cued
+	(Visual ?nominee Encoded_size ?size)
+	(Not (Tag --- Shape)) // cued
+	(Not (Visual ?nominee Shape ???))
+	// exclusions:
+	(Visual ?nominee_label Inside ?nominee)
+	(Not (Visual ?nominee_label Text ???))	// don't nominate one with a known label
+	(Not (Tag ?nominee Cursor)) // not the cursor
+	(Not (Tag ?nominee Probe_part))		// not part of the probe
+	(Not (Tag ?nominee candidate))		// not candidate currently
+	(Not (Tag ?nominee fixated))		// not being fixated currently
+	(Not (Tag Nominate ?nominee same_size nomination))
+)
+Then
+(
+	(Add (Tag Nominate ?nominee same_size nomination))
+))
+
+(NC_color_size_shape_cued_size_shape_known
+If
+(
+	(Goal Do Nominate)
+	(Step Nominate Nominate Candidates)
+	(Not (Tag --- Color)) // cued
+	(Not (Visual ?nominee Color ???))
+	(Tag ?size Size) // cued
+	(Visual ?nominee Encoded_size ?size)
+	(Tag ?shape Shape) // cued
+	(Visual ?nominee Shape ?shape)
+	// exclusions:
+	(Visual ?nominee_label Inside ?nominee)
+	(Not (Visual ?nominee_label Text ???))	// don't nominate one with a known label
+	(Not (Tag ?nominee Cursor)) // not the cursor
+	(Not (Tag ?nominee Probe_part))		// not part of the probe
+	(Not (Tag ?nominee candidate))		// not candidate currently
+	(Not (Tag ?nominee fixated))		// not being fixated currently
+	(Not (Tag Nominate ?nominee same_size_shape nomination))
+)
+Then
+(
+	(Add (Tag Nominate ?nominee same_size_shape nomination))
+))
+
+(NC_color_size_shape_cued_color_known
+If
+(
+	(Goal Do Nominate)
+	(Step Nominate Nominate Candidates)
+	(Tag ?color Color) // cued
+	(Visual ?nominee Color ?color)
+	(Not (Tag --- Size)) // cued
+	(Not (Visual ?nominee Encoded_size ???))
+	(Not (Tag --- Shape)) // cued
+	(Not (Visual ?nominee Shape ???))
+	// exclusions:
+	(Visual ?nominee_label Inside ?nominee)
+	(Not (Visual ?nominee_label Text ???))	// don't nominate one with a known label
+	(Not (Tag ?nominee Cursor)) // not the cursor
+	(Not (Tag ?nominee Probe_part))		// not part of the probe
+	(Not (Tag ?nominee candidate))		// not candidate currently
+	(Not (Tag ?nominee fixated))		// not being fixated currently
+	(Not (Tag Nominate ?nominee same_color nomination))
+)
+Then
+(
+	(Add (Tag Nominate ?nominee same_color nomination))
+))
+
+(NC_color_size_shape_cued_color_shape_known
+If
+(
+	(Goal Do Nominate)
+	(Step Nominate Nominate Candidates)
+	(Tag ?color Color) // cued
+	(Visual ?nominee Color ?color)
+	(Not (Tag --- Size)) // cued
+	(Not (Visual ?nominee Encoded_size ???))
+	(Tag ?shape Shape) // cued
+	(Visual ?nominee Shape ?shape)
+	// exclusions:
+	(Visual ?nominee_label Inside ?nominee)
+	(Not (Visual ?nominee_label Text ???))	// don't nominate one with a known label
+	(Not (Tag ?nominee Cursor)) // not the cursor
+	(Not (Tag ?nominee Probe_part))		// not part of the probe
+	(Not (Tag ?nominee candidate))		// not candidate currently
+	(Not (Tag ?nominee fixated))		// not being fixated currently
+	(Not (Tag Nominate ?nominee same_color_shape nomination))
+)
+Then
+(
+	(Add (Tag Nominate ?nominee same_color_shape nomination))
+))
+
+(NC_color_size_shape_cued_color_size_known
+If
+(
+	(Goal Do Nominate)
+	(Step Nominate Nominate Candidates)
+	(Tag ?color Color) // cued
+	(Visual ?nominee Color ?color)
+	(Tag ?size Size) // cued
+	(Visual ?nominee Encoded_size ?size)
+	(Not (Tag --- Shape)) // cued
+	(Not (Visual ?nominee Shape ???))
+	// exclusions:
+	(Visual ?nominee_label Inside ?nominee)
+	(Not (Visual ?nominee_label Text ???))	// don't nominate one with a known label
+	(Not (Tag ?nominee Cursor)) // not the cursor
+	(Not (Tag ?nominee Probe_part))		// not part of the probe
+	(Not (Tag ?nominee candidate))		// not candidate currently
+	(Not (Tag ?nominee fixated))		// not being fixated currently
+	(Not (Tag Nominate ?nominee same_color_size nomination))
+)
+Then
+(
+	(Add (Tag Nominate ?nominee same_color_size nomination))
+))
+
+(NC_color_size_shape_cued_color_size_shape_known
+If
+(
+	(Goal Do Nominate)
+	(Step Nominate Nominate Candidates)
+	(Tag ?color Color) // cued
+	(Visual ?nominee Color ?color)
+	(Tag ?size Size) // cued
+	(Visual ?nominee Encoded_size ?size)
+	(Tag ?shape Shape) // cued
+	(Visual ?nominee Shape ?shape)
+	// exclusions:
+	(Visual ?nominee_label Inside ?nominee)
+	(Not (Visual ?nominee_label Text ???))	// don't nominate one with a known label
+	(Not (Tag ?nominee Cursor)) // not the cursor
+	(Not (Tag ?nominee Probe_part))		// not part of the probe
+	(Not (Tag ?nominee candidate))		// not candidate currently
+	(Not (Tag ?nominee fixated))		// not being fixated currently
+	(Not (Tag Nominate ?nominee same_color_size_shape nomination))
+)
+Then
+(
+	(Add (Tag Nominate ?nominee same_color_size_shape nomination))
+))
+
+// Choose from nominations, tag as candidate, and look at it
+
+
+// flip a coin to decide strategy for next eye movement:
+// does this fire repeatedly? - yes need to fix
+(NC_coin_flip_color_cued
+If (
+	(Goal Check Fixated)
+	(Tag ?candidate fixated)  // do this only while a candidate is being checked
+	(Not (Tag --- Color))						// Color is cued
+	(Not (Tag Strategy Was Chosen))  // fire only once per look-at
+	(Not (Strategy Choose Random Target))
+)
+Then (
+	(Add (Tag Strategy Was Chosen))  // each look-at rule needs to delete these two adds
+	(Add_with_probability Probability2 (Strategy Choose Random Target))
+))
+
+// flip a coin to be used if Size is cued but not Color - either way on Shape
+(NC_coin_flip_color_uncued_size_cued
+If (
+	(Goal Check Fixated)
+	(Tag ?candidate fixated)  // do this only while a candidate is being checked
+	(Tag --- Color)						// Color is uncued
+	(Not (Tag --- Size))				// Size is cued
+	(Not (Tag Strategy Was Chosen))  // fire only once per look-at
+	(Not (Strategy Choose Random Target))
+)
+Then (
+	(Add (Tag Strategy Was Chosen))  // each look-at rule needs to delete these two adds
+	(Add_with_probability Probability3 (Strategy Choose Random Target))
+))
+
+// flip a coin to be used if Shape is cued but not Color or Size
+(NC_coin_flip_color_size_uncued_shape_cued
+If (
+	(Goal Check Fixated)
+	(Tag ?candidate fixated)  // do this only while a candidate is being checked
+	(Tag --- Color)						// Color is uncued
+	(Tag --- Size)						// Size uncued
+	(Not (Tag --- Shape))				// Shape is cued
+	(Not (Tag Strategy Was Chosen))  // fire only once per look-at
+	(Not (Strategy Choose Random Target))
+)
+Then (
+	(Add (Tag Strategy Was Chosen))  // each look-at rule needs to delete these two adds
+	(Add_with_probability Probability4 (Strategy Choose Random Target))
+))
+
+// flip a coin to be used for NumberOnly cue condition
+(NC_coin_flip_number_only_cue
+If (
+	(Goal Check Fixated)
+	(Tag ?candidate fixated)  // do this only while a candidate is being checked
+	(Tag --- Color)						// Color is uncued
+	(Tag --- Size)						// Size is uncued
+	(Tag --- Shape)						// Shape is uncued
+	(Not (Tag Strategy Was Chosen))  // fire only once per look-at
+	(Not (Strategy Choose Random Target))
+)
+Then (
+	(Add (Tag Strategy Was Chosen))  // each look-at rule needs to delete these two adds
+	(Add_with_probability Probability5 (Strategy Choose Random Target))
+))
+
+
+
+// look at same label
+(NC_lookat_candidate_same_label
+If
+(
+	(Goal Do Choose)
+	(Tag Nominate ?candidate same_label nomination)
+	// control
+	(Not (Tag ??? fixated))	// any previous candidate has been checked
+	(Not (Tag ??? target))	// no target being clicked on
+//	(Randomly_choose_one)				// pick just one
+	(Visual ?candidate Eccentricity ?ecc) // find closest object
+	(Least ?ecc)
+	(Motor Ocular Modality Free)		// eye must be at rest
+)
+Then
+(
+	(Send_to_motor Ocular Perform Move ?candidate)
+	(Delete (Tag Strategy Was Chosen))
+	(Delete (Strategy Choose Random Target))
+	(Delete (Tag Nominate ?candidate same_label nomination))
+	(Delete (Tag ?candidate candidate))
+	(Add (Tag ?candidate fixated))
+))
+
+
+// look at unencoded text nomination
+(NC_lookat_candidate_unencoded_text
+If
+(
+	(Goal Do Choose)
+	(Tag Nominate ?candidate unencoded_text nomination)
+	(Not (Tag Nominate ??? same_label nomination))
+	// control
+	(Not (Tag ??? fixated))	// any previous candidate has been checked
+	(Not (Tag ??? target))	// no target being clicked on
+//	(Randomly_choose_one)				// pick just one
+	(Visual ?candidate Eccentricity ?ecc) // find closest object
+	(Least ?ecc)
+	(Motor Ocular Modality Free)		// eye must be at rest
+)
+Then
+(
+	(Send_to_motor Ocular Perform Move ?candidate)
+	(Delete (Tag Strategy Was Chosen))
+	(Delete (Strategy Choose Random Target))
+	(Delete (Tag Nominate ?candidate unencoded_text nomination))
+	(Delete (Tag ?candidate candidate))
+	(Add (Tag ?candidate fixated))
+))
+
+(NC_lookat_candidate_same_color_size_shape
+If
+(
+	(Goal Do Choose)
+	(Tag Nominate ?candidate same_color_size_shape nomination)
+	(Not (Tag Nominate ??? same_label nomination))
+	(Not (Tag Nominate ??? unencoded_text nomination))
+	// control
+	(Not (Tag ??? fixated))	// any previous candidate has been checked
+	(Not (Tag ??? target))	// no target being clicked on
+//	(Randomly_choose_one)				// pick just one
+	(Visual ?candidate Eccentricity ?ecc) // find closest object
+	(Least ?ecc)
+	(Motor Ocular Modality Free)		// eye must be at rest
+)
+Then
+(
+	(Send_to_motor Ocular Perform Move ?candidate)
+	(Delete (Tag Strategy Was Chosen))
+	(Delete (Strategy Choose Random Target))
+	(Delete (Tag Nominate ?candidate same_color_size_shape nomination))
+	(Delete (Tag ?candidate candidate))
+	(Add (Tag ?candidate fixated))
+))
+
+(NC_lookat_candidate_same_color_size
+If
+(
+	(Goal Do Choose)
+	(Tag Nominate ?candidate same_color_size nomination)
+	(Not (Tag Nominate ??? same_label nomination))
+	(Not (Tag Nominate ??? unencoded_text nomination))
+	(Not (Tag Nominate ??? same_color_size_shape nomination))
+	// control
+	(Not (Tag ??? fixated))	// any previous candidate has been checked
+	(Not (Tag ??? target))	// no target being clicked on
+//	(Randomly_choose_one)				// pick just one
+	(Visual ?candidate Eccentricity ?ecc) // find closest object
+	(Least ?ecc)
+	(Motor Ocular Modality Free)		// eye must be at rest
+)
+Then
+(
+	(Send_to_motor Ocular Perform Move ?candidate)
+	(Delete (Tag Strategy Was Chosen))
+	(Delete (Strategy Choose Random Target))
+	(Delete (Tag Nominate ?candidate same_color_size nomination))
+	(Delete (Tag ?candidate candidate))
+	(Add (Tag ?candidate fixated))
+))
+
+(NC_lookat_candidate_same_color_shape
+If
+(
+	(Goal Do Choose)
+	(Tag Nominate ?candidate same_color_shape nomination)
+	(Not (Tag Nominate ??? same_label nomination))
+	(Not (Tag Nominate ??? unencoded_text nomination))
+	(Not (Tag Nominate ??? same_color_size_shape nomination))
+	(Not (Tag Nominate ??? same_color_size nomination))
+	// control
+	(Not (Tag ??? fixated))	// any previous candidate has been checked
+	(Not (Tag ??? target))	// no target being clicked on
+//	(Randomly_choose_one)				// pick just one
+	(Visual ?candidate Eccentricity ?ecc) // find closest object
+	(Least ?ecc)
+	(Motor Ocular Modality Free)		// eye must be at rest
+)
+Then
+(
+	(Send_to_motor Ocular Perform Move ?candidate)
+	(Delete (Tag Strategy Was Chosen))
+	(Delete (Strategy Choose Random Target))
+	(Delete (Tag Nominate ?candidate same_color_shape nomination))
+	(Delete (Tag ?candidate candidate))
+	(Add (Tag ?candidate fixated))
+))
+
+(NC_lookat_candidate_same_size_shape
+If
+(
+	(Goal Do Choose)
+	(Tag Nominate ?candidate same_size_shape nomination)
+	(Not (Tag Nominate ??? same_label nomination))
+	(Not (Tag Nominate ??? unencoded_text nomination))
+	(Not (Tag Nominate ??? same_color_size_shape nomination))
+	(Not (Tag Nominate ??? same_color_size nomination))
+	(Not (Tag Nominate ??? same_color_shape nomination))
+	// control
+	(Not (Tag ??? fixated))	// any previous candidate has been checked
+	(Not (Tag ??? target))	// no target being clicked on
+//	(Randomly_choose_one)				// pick just one
+	(Visual ?candidate Eccentricity ?ecc) // find closest object
+	(Least ?ecc)
+	(Motor Ocular Modality Free)		// eye must be at rest
+)
+Then
+(
+	(Send_to_motor Ocular Perform Move ?candidate)
+	(Delete (Tag Strategy Was Chosen))
+	(Delete (Strategy Choose Random Target))
+	(Delete (Tag Nominate ?candidate same_size_shape nomination))
+	(Delete (Tag ?candidate candidate))
+	(Add (Tag ?candidate fixated))
+))
+
+(NC_lookat_candidate_same_color
+If
+(
+	(Goal Do Choose)
+	(Tag Nominate ?candidate same_color nomination)
+	(Not (Tag Nominate ??? same_label nomination))
+	(Not (Tag Nominate ??? unencoded_text nomination))
+	(Not (Tag Nominate ??? same_color_size_shape nomination))
+	(Not (Tag Nominate ??? same_color_size nomination))
+	(Not (Tag Nominate ??? same_color_shape nomination))
+	(Not (Tag Nominate ??? same_size_shape nomination))
+	// control
+	(Not (Tag ??? fixated))	// any previous candidate has been checked
+	(Not (Tag ??? target))	// no target being clicked on
+//	(Randomly_choose_one)				// pick just one
+	(Visual ?candidate Eccentricity ?ecc) // find closest object
+	(Least ?ecc)
+	(Motor Ocular Modality Free)		// eye must be at rest
+)
+Then
+(
+	(Send_to_motor Ocular Perform Move ?candidate)
+	(Delete (Tag Strategy Was Chosen))
+	(Delete (Strategy Choose Random Target))
+	(Delete (Tag Nominate ?candidate same_color nomination))
+	(Delete (Tag ?candidate candidate))
+	(Add (Tag ?candidate fixated))
+))
+
+(NC_lookat_candidate_same_size
+If
+(
+	(Goal Do Choose)
+	(Tag Nominate ?candidate same_size nomination)
+	(Not (Tag Nominate ??? same_label nomination))
+	(Not (Tag Nominate ??? unencoded_text nomination))
+	(Not (Tag Nominate ??? same_color_size_shape nomination))
+	(Not (Tag Nominate ??? same_color_size nomination))
+	(Not (Tag Nominate ??? same_color_shape nomination))
+	(Not (Tag Nominate ??? same_size_shape nomination))
+	(Not (Tag Nominate ??? same_color nomination))
+	// control
+	(Not (Tag ??? fixated))	// any previous candidate has been checked
+	(Not (Tag ??? target))	// no target being clicked on
+//	(Randomly_choose_one)				// pick just one
+	(Visual ?candidate Eccentricity ?ecc) // find closest object
+	(Least ?ecc)
+	(Motor Ocular Modality Free)		// eye must be at rest
+)
+Then
+(
+	(Send_to_motor Ocular Perform Move ?candidate)
+	(Delete (Tag Strategy Was Chosen))
+	(Delete (Strategy Choose Random Target))
+	(Delete (Tag Nominate ?candidate same_size nomination))
+	(Delete (Tag ?candidate candidate))
+	(Add (Tag ?candidate fixated))
+))
+
+
+(NC_lookat_candidate_same_shape
+If
+(
+	(Goal Do Choose)
+	(Tag Nominate ?candidate same_shape nomination)
+	(Not (Tag Nominate ??? same_label nomination))
+	(Not (Tag Nominate ??? unencoded_text nomination))
+	(Not (Tag Nominate ??? same_color_size_shape nomination))
+	(Not (Tag Nominate ??? same_color_size nomination))
+	(Not (Tag Nominate ??? same_color_shape nomination))
+	(Not (Tag Nominate ??? same_size_shape nomination))
+	(Not (Tag Nominate ??? same_color nomination))
+	(Not (Tag Nominate ??? same_size nomination))
+	// control
+	(Not (Tag ??? fixated))	// any previous candidate has been checked
+	(Not (Tag ??? target))	// no target being clicked on
+//	(Randomly_choose_one)				// pick just one
+	(Visual ?candidate Eccentricity ?ecc) // find closest object
+	(Least ?ecc)
+	(Motor Ocular Modality Free)		// eye must be at rest
+)
+Then
+(
+	(Send_to_motor Ocular Perform Move ?candidate)
+	(Delete (Tag Strategy Was Chosen))
+	(Delete (Strategy Choose Random Target))
+	(Delete (Tag Nominate ?candidate same_shape nomination))
+	(Delete (Tag ?candidate candidate))
+	(Add (Tag ?candidate fixated))
+))
+
+
+(NC_lookat_unknown_object_shape_cued_closest
+If
+(
+	(Goal Do Choose)
+	(Visual ?candidate Status Visible)
+	(Visual ?candidate Color ???)	// candidate must have a color (proxy for "visibility")
+	(Not (Tag Nominate ??? ??? nomination))
+	(Tag --- Color)						// Color is uncued
+	(Tag --- Size)						// Size is uncued
+	(Not (Tag --- Shape))				// Shape is cued
+	(Not (Visual ?candidate Shape ???))	// Shape must be unknown
+	// exclusions:
+	(Not (Strategy Choose Random Target))
+	(Visual ?candidate_label Inside ?candidate)
+	(Not (Visual ?candidate_label Text ???))	// don't choose one with a known label
+	(Not (Tag ?candidate Cursor))		// not the cursor
+	(Not (Tag ?candidate Probe_part))		// not part of the probe
+	(Not (Visual ?candidate Eccentricity_zone Fovea))	// don't chose what already looking at
+	// control
+	(Not (Tag ??? fixated))	// any previous candidate has been checked
+	(Not (Tag ??? target))	// no target being clicked on
+	(Motor Ocular Modality Free)		// eye must be at rest
+	(Visual ?candidate Eccentricity ?ecc) // find closest object
+	(Least ?ecc)
+//	(Randomly_choose_one)
+)
+Then
+(
+	(Send_to_motor Ocular Perform Move ?candidate)
+	(Delete (Tag Strategy Was Chosen))
+	(Delete (Strategy Choose Random Target))
+	(Delete (Tag ?candidate candidate))
+	(Add (Tag ?candidate fixated))
+))
+
+(NC_lookat_unknown_object_shape_cued_random
+If
+(
+	(Goal Do Choose)
+	(Visual ?candidate Status Visible)
+	(Visual ?candidate Color ???)	// candidate must have a color (proxy for "visibility")
+	(Not (Tag Nominate ??? ??? nomination))
+	(Tag --- Color)						// Color is uncued
+	(Tag --- Size)						// Size is uncued
+	(Not (Tag --- Shape))				// Shape is cued
+	(Not (Visual ?candidate Shape ???))	// Shape must be unknown
+	(Strategy Choose Random Target)
+	// exclusions:
+	(Visual ?candidate_label Inside ?candidate)
+	(Not (Visual ?candidate_label Text ???))	// don't choose one with a known label
+	(Not (Tag ?candidate Cursor))		// not the cursor
+	(Not (Tag ?candidate Probe_part))		// not part of the probe
+	(Not (Visual ?candidate Eccentricity_zone Fovea))	// don't chose what already looking at
+	// control
+	(Not (Tag ??? fixated))	// any previous candidate has been checked
+	(Not (Tag ??? target))	// no target being clicked on
+	(Motor Ocular Modality Free)		// eye must be at rest
+//	(Visual ?candidate Eccentricity ?ecc) // find closest object
+//	(Least ?ecc)
+	(Randomly_choose_one)
+)
+Then
+(
+	(Send_to_motor Ocular Perform Move ?candidate)
+	(Delete (Tag Strategy Was Chosen))
+	(Delete (Strategy Choose Random Target))
+	(Delete (Tag ?candidate candidate))
+	(Add (Tag ?candidate fixated))
+))
+
+(NC_lookat_unknown_object_size_cued_closest
+If
+(
+	(Goal Do Choose)
+	(Visual ?candidate Status Visible)
+//	(Visual ?candidate Color ???)	// candidate must have a color (proxy for "visibility")
+	(Not (Tag Nominate ??? ??? nomination))
+	(Tag --- Color)						// Color is uncued
+	(Not (Tag --- Size))				// Size is cued
+	(Not (Visual ?candidate Size ???))	// Size must be unknown
+	(Tag --- Shape)						// Shape is uncued
+	// exclusions:
+	(Not (Strategy Choose Random Target))
+	(Visual ?candidate_label Inside ?candidate)
+	(Not (Visual ?candidate_label Text ???))	// don't choose one with a known label
+	(Not (Tag ?candidate Cursor))		// not the cursor
+	(Not (Tag ?candidate Probe_part))		// not part of the probe
+	(Not (Visual ?candidate Eccentricity_zone Fovea))	// don't chose what already looking at
+	// control
+	(Not (Tag ??? fixated))	// any previous candidate has been checked
+	(Not (Tag ??? target))	// no target being clicked on
+	(Motor Ocular Modality Free)		// eye must be at rest
+	(Visual ?candidate Eccentricity ?ecc) // find closest object
+	(Least ?ecc)
+//	(Randomly_choose_one)
+)
+Then
+(
+	(Send_to_motor Ocular Perform Move ?candidate)
+	(Delete (Tag Strategy Was Chosen))
+	(Delete (Strategy Choose Random Target))
+	(Delete (Tag ?candidate candidate))
+	(Add (Tag ?candidate fixated))
+))
+
+(NC_lookat_unknown_object_size_cued_random
+If
+(
+	(Goal Do Choose)
+	(Visual ?candidate Status Visible)
+//	(Visual ?candidate Color ???)	// candidate must have a color (proxy for "visibility")
+	(Not (Tag Nominate ??? ??? nomination))
+	(Tag --- Color)						// Color is uncued
+	(Not (Tag --- Size))				// Size is cued
+	(Not (Visual ?candidate Size ???))	// Size must be unknown
+	(Tag --- Shape)						// Shape is uncued
+	(Strategy Choose Random Target)
+	// exclusions:
+	(Visual ?candidate_label Inside ?candidate)
+	(Not (Visual ?candidate_label Text ???))	// don't choose one with a known label
+	(Not (Tag ?candidate Cursor))		// not the cursor
+	(Not (Tag ?candidate Probe_part))		// not part of the probe
+	(Not (Visual ?candidate Eccentricity_zone Fovea))	// don't chose what already looking at
+	// control
+	(Not (Tag ??? fixated))	// any previous candidate has been checked
+	(Not (Tag ??? target))	// no target being clicked on
+	(Motor Ocular Modality Free)		// eye must be at rest
+//	(Visual ?candidate Eccentricity ?ecc) // find closest object
+//	(Least ?ecc)
+	(Randomly_choose_one)
+)
+Then
+(
+	(Send_to_motor Ocular Perform Move ?candidate)
+	(Delete (Tag Strategy Was Chosen))
+	(Delete (Strategy Choose Random Target))
+	(Delete (Tag ?candidate candidate))
+	(Add (Tag ?candidate fixated))
+))
+
+(NC_lookat_unknown_object_size_shape_cued_closest
+If
+(
+	(Goal Do Choose)
+	(Visual ?candidate Status Visible)
+//	(Visual ?candidate Color ???)	// candidate must have a color (proxy for "visibility")
+	(Not (Tag Nominate ??? ??? nomination))
+	(Tag --- Color)						// Color is uncued
+	(Not (Tag --- Size))				// Size is cued
+	(Not (Visual ?candidate Size ???))	// Size must be unknown
+	(Not (Tag --- Shape))				// Shape is cued
+	(Not (Visual ?candidate Shape ???))	// Shape must be unknown
+	// exclusions:
+	(Not (Strategy Choose Random Target))
+	(Visual ?candidate_label Inside ?candidate)
+	(Not (Visual ?candidate_label Text ???))	// don't choose one with a known label
+	(Not (Tag ?candidate Cursor))		// not the cursor
+	(Not (Tag ?candidate Probe_part))		// not part of the probe
+	(Not (Visual ?candidate Eccentricity_zone Fovea))	// don't chose what already looking at
+	// control
+	(Not (Tag ??? fixated))	// any previous candidate has been checked
+	(Not (Tag ??? target))	// no target being clicked on
+	(Motor Ocular Modality Free)		// eye must be at rest
+	(Visual ?candidate Eccentricity ?ecc) // find closest object
+	(Least ?ecc)
+//	(Randomly_choose_one)
+)
+Then
+(
+	(Send_to_motor Ocular Perform Move ?candidate)
+	(Delete (Tag Strategy Was Chosen))
+	(Delete (Strategy Choose Random Target))
+	(Delete (Tag ?candidate candidate))
+	(Add (Tag ?candidate fixated))
+))
+
+(NC_lookat_unknown_object_size_shape_cued_random
+If
+(
+	(Goal Do Choose)
+	(Visual ?candidate Status Visible)
+//	(Visual ?candidate Color ???)	// candidate must have a color (proxy for "visibility")
+	(Not (Tag Nominate ??? ??? nomination))
+	(Tag --- Color)						// Color is uncued
+	(Not (Tag --- Size))				// Size is cued
+	(Not (Visual ?candidate Size ???))	// Size must be unknown
+	(Not (Tag --- Shape))				// Shape is cued
+	(Not (Visual ?candidate Shape ???))	// Shape must be unknown
+	(Strategy Choose Random Target)
+	// exclusions:
+	(Visual ?candidate_label Inside ?candidate)
+	(Not (Visual ?candidate_label Text ???))	// don't choose one with a known label
+	(Not (Tag ?candidate Cursor))		// not the cursor
+	(Not (Tag ?candidate Probe_part))		// not part of the probe
+	(Not (Visual ?candidate Eccentricity_zone Fovea))	// don't chose what already looking at
+	// control
+	(Not (Tag ??? fixated))	// any previous candidate has been checked
+	(Not (Tag ??? target))	// no target being clicked on
+	(Motor Ocular Modality Free)		// eye must be at rest
+//	(Visual ?candidate Eccentricity ?ecc) // find closest object
+//	(Least ?ecc)
+	(Randomly_choose_one)
+)
+Then
+(
+	(Send_to_motor Ocular Perform Move ?candidate)
+	(Delete (Tag Strategy Was Chosen))
+	(Delete (Strategy Choose Random Target))
+	(Delete (Tag ?candidate candidate))
+	(Add (Tag ?candidate fixated))
+))
+
+
+(NC_lookat_unknown_object_color_cued_closest
+If
+(
+	(Goal Do Choose)
+	(Visual ?candidate Status Visible)
+	(Not (Tag Nominate ??? ??? nomination))
+	(Not (Tag --- Color))				// Color is cued
+	(Not (Visual ?candidate Color ???))	// candidate color must be unknown
+	(Tag --- Size)						// Size is uncued
+	(Tag --- Shape)						// Shape is uncued
+	// exclusions:
+	(Not (Strategy Choose Random Target))
+	(Visual ?candidate_label Inside ?candidate)
+	(Not (Visual ?candidate_label Text ???))	// don't choose one with a known label
+	(Not (Tag ?candidate Cursor))		// not the cursor
+	(Not (Tag ?candidate Probe_part))		// not part of the probe
+	(Not (Visual ?candidate Eccentricity_zone Fovea))	// don't chose what already looking at
+	// control
+	(Not (Tag ??? fixated))	// any previous candidate has been checked
+	(Not (Tag ??? target))	// no target being clicked on
+	(Motor Ocular Modality Free)		// eye must be at rest
+	(Visual ?candidate Eccentricity ?ecc) // find closest object
+	(Least ?ecc)
+//	(Randomly_choose_one)
+)
+Then
+(
+	(Send_to_motor Ocular Perform Move ?candidate)
+	(Delete (Tag Strategy Was Chosen))
+	(Delete (Strategy Choose Random Target))
+	(Delete (Tag ?candidate candidate))
+	(Add (Tag ?candidate fixated))
+))
+
+(NC_lookat_unknown_object_color_cued_random
+If
+(
+	(Goal Do Choose)
+	(Visual ?candidate Status Visible)
+	(Not (Tag Nominate ??? ??? nomination))
+	(Not (Tag --- Color))				// Color is cued
+	(Not (Visual ?candidate Color ???))	// candidate color must be unknown
+	(Tag --- Size)						// Size is uncued
+	(Tag --- Shape)						// Shape is uncued
+	(Strategy Choose Random Target)
+	// exclusions:
+	(Visual ?candidate_label Inside ?candidate)
+	(Not (Visual ?candidate_label Text ???))	// don't choose one with a known label
+	(Not (Tag ?candidate Cursor))		// not the cursor
+	(Not (Tag ?candidate Probe_part))		// not part of the probe
+	(Not (Visual ?candidate Eccentricity_zone Fovea))	// don't chose what already looking at
+	// control
+	(Not (Tag ??? fixated))	// any previous candidate has been checked
+	(Not (Tag ??? target))	// no target being clicked on
+	(Motor Ocular Modality Free)		// eye must be at rest
+//	(Visual ?candidate Eccentricity ?ecc) // find closest object
+//	(Least ?ecc)
+	(Randomly_choose_one)
+)
+Then
+(
+	(Send_to_motor Ocular Perform Move ?candidate)
+	(Delete (Tag Strategy Was Chosen))
+	(Delete (Strategy Choose Random Target))
+	(Delete (Tag ?candidate candidate))
+	(Add (Tag ?candidate fixated))
+))
+
+(NC_lookat_unknown_object_color_shape_cued_closest
+If
+(
+	(Goal Do Choose)
+	(Visual ?candidate Status Visible)
+	(Not (Tag Nominate ??? ??? nomination))
+	(Not (Tag --- Color))				// Color is cued
+	(Not (Visual ?candidate Color ???))	// Color must be unknown
+	(Tag --- Size)						// Size is uncued
+	(Not (Tag --- Shape))				// Shape is cued
+	(Not (Visual ?candidate Shape ???))	// Shape must be unknown
+	// exclusions:
+	(Not (Strategy Choose Random Target))
+	(Visual ?candidate_label Inside ?candidate)
+	(Not (Visual ?candidate_label Text ???))	// don't choose one with a known label
+	(Not (Tag ?candidate Cursor))		// not the cursor
+	(Not (Tag ?candidate Probe_part))		// not part of the probe
+	(Not (Visual ?candidate Eccentricity_zone Fovea))	// don't chose what already looking at
+	// control
+	(Not (Tag ??? fixated))	// any previous candidate has been checked
+	(Not (Tag ??? target))	// no target being clicked on
+	(Motor Ocular Modality Free)		// eye must be at rest
+	(Visual ?candidate Eccentricity ?ecc) // find closest object
+	(Least ?ecc)
+//	(Randomly_choose_one)
+)
+Then
+(
+	(Send_to_motor Ocular Perform Move ?candidate)
+	(Delete (Tag Strategy Was Chosen))
+	(Delete (Strategy Choose Random Target))
+	(Delete (Tag ?candidate candidate))
+	(Add (Tag ?candidate fixated))
+))
+
+(NC_lookat_unknown_object_color_shape_cued_random
+If
+(
+	(Goal Do Choose)
+	(Visual ?candidate Status Visible)
+	(Not (Tag Nominate ??? ??? nomination))
+	(Not (Tag --- Color))				// Color is cued
+	(Not (Visual ?candidate Color ???))	// Color must be unknown
+	(Tag --- Size)						// Size is uncued
+	(Not (Tag --- Shape))				// Shape is cued
+	(Not (Visual ?candidate Shape ???))	// Shape must be unknown
+	(Strategy Choose Random Target)
+	// exclusions:
+	(Visual ?candidate_label Inside ?candidate)
+	(Not (Visual ?candidate_label Text ???))	// don't choose one with a known label
+	(Not (Tag ?candidate Cursor))		// not the cursor
+	(Not (Tag ?candidate Probe_part))		// not part of the probe
+	(Not (Visual ?candidate Eccentricity_zone Fovea))	// don't chose what already looking at
+	// control
+	(Not (Tag ??? fixated))	// any previous candidate has been checked
+	(Not (Tag ??? target))	// no target being clicked on
+	(Motor Ocular Modality Free)		// eye must be at rest
+//	(Visual ?candidate Eccentricity ?ecc) // find closest object
+//	(Least ?ecc)
+	(Randomly_choose_one)
+)
+Then
+(
+	(Send_to_motor Ocular Perform Move ?candidate)
+	(Delete (Tag Strategy Was Chosen))
+	(Delete (Strategy Choose Random Target))
+	(Delete (Tag ?candidate candidate))
+	(Add (Tag ?candidate fixated))
+))
+
+(NC_lookat_unknown_object_color_size_cued_closest
+If
+(
+	(Goal Do Choose)
+	(Visual ?candidate Status Visible)
+	(Not (Tag Nominate ??? ??? nomination))
+	(Not (Tag --- Color))				// Color is cued
+	(Not (Visual ?candidate Color ???))	// candidate color must be unknown
+	(Not (Tag --- Size))				// Size is cued
+	(Not (Visual ?candidate Encoded_size ???))	// candidate size must be unknown
+	(Tag --- Shape)						// Shape is uncued
+	// exclusions:
+	(Not (Strategy Choose Random Target))
+	(Visual ?candidate_label Inside ?candidate)
+	(Not (Visual ?candidate_label Text ???))	// don't choose one with a known label
+	(Not (Tag ?candidate Cursor))		// not the cursor
+	(Not (Tag ?candidate Probe_part))		// not part of the probe
+	(Not (Visual ?candidate Eccentricity_zone Fovea))	// don't chose what already looking at
+	// control
+	(Not (Tag ??? fixated))	// any previous candidate has been checked
+	(Not (Tag ??? target))	// no target being clicked on
+	(Motor Ocular Modality Free)		// eye must be at rest
+	(Visual ?candidate Eccentricity ?ecc) // find closest object
+	(Least ?ecc)
+//	(Randomly_choose_one)
+)
+Then
+(
+	(Send_to_motor Ocular Perform Move ?candidate)
+	(Delete (Tag Strategy Was Chosen))
+	(Delete (Strategy Choose Random Target))
+	(Delete (Tag ?candidate candidate))
+	(Add (Tag ?candidate fixated))
+))
+
+(NC_lookat_unknown_object_color_size_cued_random
+If
+(
+	(Goal Do Choose)
+	(Visual ?candidate Status Visible)
+	(Not (Tag Nominate ??? ??? nomination))
+	(Not (Tag --- Color))				// Color is cued
+	(Not (Visual ?candidate Color ???))	// candidate color must be unknown
+	(Not (Tag --- Size))				// Size is cued
+	(Not (Visual ?candidate Encoded_size ???))	// candidate size must be unknown
+	(Tag --- Shape)						// Shape is uncued
+	(Strategy Choose Random Target)
+	// exclusions:
+	(Visual ?candidate_label Inside ?candidate)
+	(Not (Visual ?candidate_label Text ???))	// don't choose one with a known label
+	(Not (Tag ?candidate Cursor))		// not the cursor
+	(Not (Tag ?candidate Probe_part))		// not part of the probe
+	(Not (Visual ?candidate Eccentricity_zone Fovea))	// don't chose what already looking at
+	// control
+	(Not (Tag ??? fixated))	// any previous candidate has been checked
+	(Not (Tag ??? target))	// no target being clicked on
+	(Motor Ocular Modality Free)		// eye must be at rest
+//	(Visual ?candidate Eccentricity ?ecc) // find closest object
+//	(Least ?ecc)
+	(Randomly_choose_one)
+)
+Then
+(
+	(Send_to_motor Ocular Perform Move ?candidate)
+	(Delete (Tag Strategy Was Chosen))
+	(Delete (Strategy Choose Random Target))
+	(Delete (Tag ?candidate candidate))
+	(Add (Tag ?candidate fixated))
+))
+
+(NC_lookat_unknown_object_color_size_shape_cued_closest
+If
+(
+	(Goal Do Choose)
+	(Visual ?candidate Status Visible)
+	(Not (Tag Nominate ??? ??? nomination))
+	(Not (Tag --- Color))				// Color is cued
+	(Not (Visual ?candidate Color ???))	// Color must be unknown
+	(Not (Tag --- Size))				// Size is cued
+	(Not (Visual ?candidate Encoded_size ???))	// Size must be unknown
+	(Not (Tag --- Shape))				// Shape is cued
+	(Not (Visual ?candidate Shape ???))	// Shape must be unknown
+	// exclusions:
+	(Not (Strategy Choose Random Target))
+	(Visual ?candidate_label Inside ?candidate)
+	(Not (Visual ?candidate_label Text ???))	// don't choose one with a known label
+	(Not (Tag ?candidate Cursor))		// not the cursor
+	(Not (Tag ?candidate Probe_part))		// not part of the probe
+	(Not (Visual ?candidate Eccentricity_zone Fovea))	// don't chose what already looking at
+	// control
+	(Not (Tag ??? fixated))	// any previous candidate has been checked
+	(Not (Tag ??? target))	// no target being clicked on
+	(Motor Ocular Modality Free)		// eye must be at rest
+	(Visual ?candidate Eccentricity ?ecc) // find closest object
+	(Least ?ecc)
+//	(Randomly_choose_one)
+)
+Then
+(
+	(Send_to_motor Ocular Perform Move ?candidate)
+	(Delete (Tag Strategy Was Chosen))
+	(Delete (Strategy Choose Random Target))
+	(Delete (Tag ?candidate candidate))
+	(Add (Tag ?candidate fixated))
+))
+
+(NC_lookat_unknown_object_color_size_shape_cued_random
+If
+(
+	(Goal Do Choose)
+	(Visual ?candidate Status Visible)
+	(Not (Tag Nominate ??? ??? nomination))
+	(Not (Tag --- Color))				// Color is cued
+	(Not (Visual ?candidate Color ???))	// Color must be unknown
+	(Not (Tag --- Size))				// Size is cued
+	(Not (Visual ?candidate Encoded_size ???))	// Size must be unknown
+	(Not (Tag --- Shape))				// Shape is cued
+	(Not (Visual ?candidate Shape ???))	// Shape must be unknown
+	(Strategy Choose Random Target)
+	// exclusions:
+	(Visual ?candidate_label Inside ?candidate)
+	(Not (Visual ?candidate_label Text ???))	// don't choose one with a known label
+	(Not (Tag ?candidate Cursor))		// not the cursor
+	(Not (Tag ?candidate Probe_part))		// not part of the probe
+	(Not (Visual ?candidate Eccentricity_zone Fovea))	// don't chose what already looking at
+	// control
+	(Not (Tag ??? fixated))	// any previous candidate has been checked
+	(Not (Tag ??? target))	// no target being clicked on
+	(Motor Ocular Modality Free)		// eye must be at rest
+//	(Visual ?candidate Eccentricity ?ecc) // find closest object
+//	(Least ?ecc)
+	(Randomly_choose_one)
+)
+Then
+(
+	(Send_to_motor Ocular Perform Move ?candidate)
+	(Delete (Tag Strategy Was Chosen))
+	(Delete (Strategy Choose Random Target))
+	(Delete (Tag ?candidate candidate))
+	(Add (Tag ?candidate fixated))
+))
+
+(NC_lookat_unknown_object_text_only_no_cue_closest
+If
+(
+	(Goal Do Choose)
+	(Visual ?candidate Status Visible)
+	(Visual ?candidate Color ???)	// candidate must have a color (proxy for "visibility")
+	(Not (Tag Nominate ??? ??? nomination))
+	(Tag --- Color)						// Color is uncued
+	(Tag --- Size)						// Size is uncued
+	(Tag --- Shape)						// Shape is uncued
+	// exclusions:
+	(Not (Strategy Choose Random Target))
+	(Visual ?candidate_label Inside ?candidate)
+	(Not (Visual ?candidate_label Text ???))	// don't choose one with a known label
+	(Not (Tag ?candidate Cursor))		// not the cursor
+	(Not (Tag ?candidate Probe_part))		// not part of the probe
+	(Not (Visual ?candidate Eccentricity_zone Fovea))	// don't chose what already looking at
+	// control
+	(Not (Tag ??? fixated))	// any previous candidate has been checked
+	(Not (Tag ??? target))	// no target being clicked on
+	(Motor Ocular Modality Free)		// eye must be at rest
+	(Visual ?candidate Eccentricity ?ecc) // find closest object
+	(Least ?ecc)
+//	(Randomly_choose_one)
+)
+Then
+(
+	(Send_to_motor Ocular Perform Move ?candidate)
+	(Delete (Tag Strategy Was Chosen))
+	(Delete (Strategy Choose Random Target))
+	(Delete (Tag ?candidate candidate))
+	(Add (Tag ?candidate fixated))
+))
+
+(NC_lookat_unknown_object_text_only_no_cue_random
+If
+(
+	(Goal Do Choose)
+	(Visual ?candidate Status Visible)
+	(Visual ?candidate Color ???)	// candidate must have a color (proxy for "visibility")
+	(Not (Tag Nominate ??? ??? nomination))
+	(Tag --- Color)						// Color is uncued
+	(Tag --- Size)						// Size is uncued
+	(Tag --- Shape)						// Shape is uncued
+	(Strategy Choose Random Target)
+	// exclusions:
+	(Visual ?candidate_label Inside ?candidate)
+	(Not (Visual ?candidate_label Text ???))	// don't choose one with a known label
+	(Not (Tag ?candidate Cursor))		// not the cursor
+	(Not (Tag ?candidate Probe_part))		// not part of the probe
+	(Not (Visual ?candidate Eccentricity_zone Fovea))	// don't chose what already looking at
+	// control
+	(Not (Tag ??? fixated))	// any previous candidate has been checked
+	(Not (Tag ??? target))	// no target being clicked on
+	(Motor Ocular Modality Free)		// eye must be at rest
+//	(Visual ?candidate Eccentricity ?ecc) // find closest object
+//	(Least ?ecc)
+	(Randomly_choose_one)
+)
+Then
+(
+	(Send_to_motor Ocular Perform Move ?candidate)
+	(Delete (Tag Strategy Was Chosen))
+	(Delete (Strategy Choose Random Target))
+	(Delete (Tag ?candidate candidate))
+	(Add (Tag ?candidate fixated))
+))
+
+// This rule should fire whenever a lookat rule fires
+(NC_lookat_control1
+If
+(
+	(Goal Do Choose)
+	(Not (Step NC Waitfor Lookat_fire))
+	// control
+	(Not (Tag ??? fixated))	// any previous candidate has been checked
+	(Not (Tag ??? target))	// no target being clicked on
+	(Motor Ocular Modality Free)		// eye must be at rest
+)
+Then
+(
+	(Add (Step NC Waitfor Lookat_fire))
+))
+
+// This rule should fire on the cycle after a lookat rule could have fired and did
+(NC_lookat_control2
+If
+(
+	(Goal Do Choose)
+	(Step NC Waitfor Lookat_fire)
+	// control
+	(Tag ??? fixated)	// a candidate is being checked
+)
+Then
+(
+	(Delete (Step NC Waitfor Lookat_fire))
+))
+
+// This rule should fire on the cycle after a lookat rule could have fired but didn't
+(NC_lookat_unknown_random_object
+If
+(
+	(Goal Do Choose)
+	(Step NC Waitfor Lookat_fire)
+	(Visual ?candidate Status Visible)
+	(Not (Tag Nominate ??? ??? nomination))
+	// exclusions:
+	(Visual ?candidate_label Inside ?candidate)
+	(Not (Visual ?candidate_label Text ???))	// don't choose one with a known label
+	(Not (Tag ?candidate Cursor))		// not the cursor
+	(Not (Tag ?candidate Probe_part))		// not part of the probe
+	(Not (Visual ?candidate Eccentricity_zone Fovea))	// don't chose what already looking at
+	// control
+	(Not (Tag ??? fixated))	// any previous candidate has been checked
+	(Not (Tag ??? target))	// no target being clicked on
+	(Motor Ocular Modality Free)		// eye must be at rest
+	(Randomly_choose_one)
+)
+Then
+(
+	(Send_to_motor Ocular Perform Move ?candidate)
+	(Delete (Step NC Waitfor Lookat_fire))
+	(Delete (Tag Strategy Was Chosen))
+	(Delete (Strategy Choose Random Target))
+	(Delete (Tag ?candidate candidate))
+	(Add (Tag ?candidate fixated))
+))
+
+
+// clean up all the nominations and restart
+(NC_restart_nomination
+If
+(
+	(Goal Do Nominate)
+	(Step Nominate ClearRestart Nomination)
+)
+Then
+(
+	(Delete (Step Nominate ClearRestart Nomination))
+	(Add (Step Nominate Nominate Candidates))	// loop and wait
+))
+
+// clean up all the nominations and restart
+(NC_clear_nomination
+If
+(
+	(Goal Do Nominate)
+	(Step Nominate ClearRestart Nomination)
+	(Tag Nominate ?nomination ?nomination_type nomination)
+)
+Then
+(
+	(Delete (Tag Nominate ?nomination ?nomination_type nomination))
+))
+
+
+// CF thread - check a fixated candidate
+// This thread starts when a candidate appears, and retags it as the fixated object,
+// fixates it, and decides whether it matches or not. If not, the thread waits for
+// a candidate to appear again. The fixated object is kept tagged until its status
+// is decided to prevent it from being immediately rechosen.
+
+// startup rule
+(CF_startup
+If (
+	(Goal Check Fixated)
+	(Not (Step CF ??? ???))
+)
+Then (
+//	(Add (Step CF Check Properties))
+	(Add (Step CF Waitfor EyeMove_done))
+))
+
+// shutdown rules - remove CF goals, steps, and tags
+// this is called by top level if this thread needs to be force terminated
+(CF_shutdown
+If (
+	(Goal Shutdown CheckFixated)
+	(Step CF ?x ?y)
+)
+Then (
+	(Delete (Step CF ?x ?y))
+	(Delete (Goal Check Fixated))
+	(Delete (Goal Shutdown CheckFixated))
+))
+
+(CF_shutdown_cleanup
+If (
+	(Goal Shutdown CheckFixated)
+	(Tag CF ?x ?y ?z)
+)
+Then (
+	(Delete (Tag CF ?x ?y ?z))
+	(Delete (Goal Check Fixated))
+	(Delete (Goal Shutdown CheckFixated))
+))
+
+(CF_shutdown_no_step
+If (
+	(Goal Shutdown CheckFixated)
+	(Not (Step CF ?x ?y))
+)
+Then (
+	(Delete (Goal Check Fixated))
+	(Delete (Goal Shutdown CheckFixated))
+))
+
+// when eye movement done, pause to give properties a chance to update
+(CF_wait_for_movement_done
+If
+(
+	(Goal Check Fixated)
+	(Step CF Waitfor EyeMove_done)
+	(Tag ?candidate fixated)
+	(Motor Ocular Modality Free)	// eye is not in motion
+)
+Then
+(
+//	(Delete (Tag ?candidate fixated))
+	(Delete (Step CF Waitfor EyeMove_done))
+//	(Add (Step CF Pausefor Property_update))
+	(Add (Step CF Waitfor Property_update))
+))
+
+// DISABLED RULES IN PREVIOUS VERSIONS HAVE BEEN DELETED FROM THIS VERSION
+
+// after waiting for properties to update, wait for nominations to happen
+// then release the eye for next fixation choice
+(CF_wait_for_nominations_update
+If
+(
+	(Goal Check Fixated)
+	(Step CF Waitfor Property_update)
+	(Tag ?candidate fixated)
+)
+Then
+(
+	(Delete (Tag ?candidate fixated))
+	(Delete (Step CF Waitfor Property_update))
+))
+
+// if the label matches, tag as target to stop scan, clear strategy choice items
+// turn off centering to avoid stray eye movements from cursor motion, etc
+(CF_check_candidate_label_match
+If
+(
+	(Goal Check Fixated)
+	(Step CF Waitfor Property_update)
+	(Tag ?candidate fixated)
+	(Visual ?candidate_label Inside ?candidate)
+	(Tag ?label Label)
+	(Not (Tag ?candidate Probe_label_object))
+	(Visual ?candidate_label Text ?label)
+	(Motor Ocular Modality Free)	// eye is not in motion
+)
+Then
+(
+	(Send_to_motor Ocular Perform Set_mode Disable Centering)
+	(Add (Tag ?candidate target))
+	(Delete (Step CF Waitfor Property_update))
+	(Add (Step CF Make Found_Response))
+	(Delete (Tag Strategy Was Chosen))
+	(Delete (Strategy Choose Random Target))
+))
+
+// if we somehow found a probe object, clear and do the next fixation
+(CF_check_candidate_object_is_probe_label
+If
+(
+	(Goal Check Fixated)
+//	(Step CF Waitfor EyeMove_done)
+	(Step CF Waitfor Property_update)
+	(Tag ?candidate fixated)
+	(Tag ?label Label)
+	(Tag ?candidate Probe_label_object)
+	(Visual ?candidate Text ?label)
+	(Motor Ocular Modality Free)
+)
+Then
+(
+//	(Delete (Step CF Check Properties))
+	(Delete (Step CF Waitfor Property_update))
+//	(Add (Step Cleanup Text_wait))
+	(Delete (Tag ?candidate fixated))
+))
+
+// is the eye still on the target?
+(CF_make_response
+If
+(
+	(Goal Check Fixated)
+	(Step CF Make Found_Response)
+	(Tag ?candidate target)
+	(Motor Manual Processor Free)
+)
+Then
+(
+	(Send_to_motor Manual Perform Click_on ?candidate)
+	(Delete (Step CF Make Found_Response))
+	(Add (Step CF Wait_for Feedback))
+))
+
+(CF_debug_make_response1
+If
+(
+(THIS RULE IS DISABLED)
+	(Goal Check Fixated)
+	(Step CF Make Found_Response)
+	(Tag ?candidate target)
+	(Motor Manual Processor Free)
+	(Motor Ocular Modality Busy)
+)
+Then
+(
+	(Log Eye Busy when Click_on ?candidate commanded)
+))
+
+(CF_debug_make_response2
+If
+(
+	(Goal Check Fixated)
+	(Step CF Wait_for Feedback)
+	(Motor Manual Processor Busy)
+	(Motor Ocular Modality Busy)
+)
+Then
+(
+	(Log Eye and Manual are both Busy during Wait_for Feedback)
+))
+
+
+
+
+// feedback is disappearance of candidate object
+(CF_got_feedback
+If
+(
+	(Goal Check Fixated)
+	(Step CF Wait_for Feedback)
+	(Tag ?candidate target)
+	(Not (Visual ?candidate Status Visible))
+)
+Then
+(
+	(Delete (Step CF Wait_for Feedback))
+	(Add (Step CF Terminate Thread))
+))
+
+(CF_terminate
+If
+(
+	(Goal Check Fixated)
+	(Step CF Terminate Thread)
+)
+Then
+(
+	(Delete (Step CF Terminate Thread))
+	// tell top level we are done
+	(Add (Status Trial Done))
+	// terminate this thread
+	(Delete (Goal Check Fixated))
+))
+
+
+// Fires at the same time as the terminate rule
+(CF_clear_CF_tags
+If (
+	(Goal Check Fixated)
+	(Step CF Terminate Thread)
+	(Tag CF ?object ?tag)
+)
+Then (
+	(Delete (Tag CF ?object ?tag))
+))
