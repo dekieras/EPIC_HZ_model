@@ -15,6 +15,12 @@
 
 /* Begin PBXFileReference section */
 		B70FDCC71D22E5B00055A0EB /* EPICLib.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = EPICLib.framework; path = ../../../../Users/kieras/Library/Frameworks/EPICLib.framework; sourceTree = DEVELOPER_DIR; };
+		B746704A1D22E89B0008CCD2 /* HowDeviceWorksNotes.txt */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = HowDeviceWorksNotes.txt; path = ../HowDeviceWorksNotes.txt; sourceTree = "<group>"; };
+		B746704B1D22E89B0008CCD2 /* LICENSE.txt */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = LICENSE.txt; path = ../LICENSE.txt; sourceTree = "<group>"; };
+		B746704C1D22E89B0008CCD2 /* HZ13_opt_v6i.prs */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = HZ13_opt_v6i.prs; path = ../HZ13_opt_v6i.prs; sourceTree = "<group>"; };
+		B746704D1D22E89B0008CCD2 /* HZ13_opt_v6k.prs */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = HZ13_opt_v6k.prs; path = ../HZ13_opt_v6k.prs; sourceTree = "<group>"; };
+		B746704E1D22E89B0008CCD2 /* HZ13_opt_v6j.prs */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = HZ13_opt_v6j.prs; path = ../HZ13_opt_v6j.prs; sourceTree = "<group>"; };
+		B746704F1D22E89B0008CCD2 /* inputFilesForExecutable */ = {isa = PBXFileReference; lastKnownFileType = folder; name = inputFilesForExecutable; path = ../inputFilesForExecutable; sourceTree = "<group>"; };
 		B777718716EA749C006A8894 /* create_HZ13_device.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = create_HZ13_device.cpp; path = Source/create_HZ13_device.cpp; sourceTree = "<group>"; };
 		B7DB82A31AC6315100472DF2 /* HZ13_v5_device.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = HZ13_v5_device.cpp; path = Source/HZ13_v5_device.cpp; sourceTree = "<group>"; };
 		B7DB82A41AC6315100472DF2 /* HZ13_v5_device.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = HZ13_v5_device.h; path = Source/HZ13_v5_device.h; sourceTree = "<group>"; };
@@ -36,6 +42,12 @@
 		08FB7794FE84155DC02AAC07 /* W67_device */ = {
 			isa = PBXGroup;
 			children = (
+				B746704A1D22E89B0008CCD2 /* HowDeviceWorksNotes.txt */,
+				B746704B1D22E89B0008CCD2 /* LICENSE.txt */,
+				B746704C1D22E89B0008CCD2 /* HZ13_opt_v6i.prs */,
+				B746704D1D22E89B0008CCD2 /* HZ13_opt_v6k.prs */,
+				B746704E1D22E89B0008CCD2 /* HZ13_opt_v6j.prs */,
+				B746704F1D22E89B0008CCD2 /* inputFilesForExecutable */,
 				08FB7795FE84155DC02AAC07 /* Source */,
 				B7E220150E2400270086E23C /* External Frameworks */,
 				1AB674ADFE9D54B511CA2CBB /* Products */,
